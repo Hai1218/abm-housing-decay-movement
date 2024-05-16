@@ -150,7 +150,7 @@ class RegionAgent(mg.GeoAgent):
         self.num_people = self.init_num_people
         self.rent_regulated = random.choice([True, False])
         logging.debug(f"region {self.unique_id} rent regulation is {self.rent_regulated}.")
-        self.initial_quality = random.uniform(20, 100)
+        self.initial_quality = random.uniform(50, 100)
         logging.debug(f"region {self.unique_id} initial quality is {self.initial_quality}.")
         self.housing_quality = self.initial_quality
         self.rent_discount = rent_discount
@@ -226,9 +226,9 @@ class RegionAgent(mg.GeoAgent):
         logging.debug(f"Region's rent regulation is {self.rent_regulated}, quality is {self.housing_quality},rent is {self.rent_price} and overall AMI is {self.area_ami}, own AMI is {self.own_ami}")
         self.decays()
         if self.housing_quality <= 50:
-            if self.rent_regulated and self.num_complaints > 100:  # Assuming a threshold for renovation
+            if self.rent_regulated and self.num_complaints > 30:  # Assuming a threshold for renovation
                 self.renovate()
-            if not self.rent_regulated and self.num_complaints > 30: 
+            if not self.rent_regulated and self.num_complaints > 20: 
                 self.renovate()
     
     def decays(self):
@@ -239,9 +239,9 @@ class RegionAgent(mg.GeoAgent):
     def renovate(self):
         # Resets housing quality and increments renovations counter
         if self.rent_regulated:
-            self.housing_quality = 90
-        else: 
             self.housing_quality = 60
+        else: 
+            self.housing_quality = 90
         self.renovations += 1
         logging.debug(f"Region {self.unique_id} is renovated.")
         self.steps = 0  # Reset step counter after renovation

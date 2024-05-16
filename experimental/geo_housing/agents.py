@@ -125,10 +125,12 @@ class PersonAgent(mg.GeoAgent):
 
     def move_to_suitable_region(self):
 
+        # suitable_regions = [agent for agent in self.model.space.agents if isinstance(agent, RegionAgent) and
+        #                     agent.housing_quality >= self.housing_quality_threshold and
+        #                     agent.rent_price <= self.maximum_affordable_rent and agent.people_count <= 2]
         suitable_regions = [agent for agent in self.model.space.agents if isinstance(agent, RegionAgent) and
                             agent.housing_quality >= self.housing_quality_threshold and
-                            agent.rent_price <= self.maximum_affordable_rent and agent.people_count <= 5]
-
+                            agent.rent_price <= self.maximum_affordable_rent]
         if suitable_regions:
             new_region = random.choice(suitable_regions)
             new_region_id = new_region.unique_id
@@ -178,7 +180,7 @@ class RegionAgent(mg.GeoAgent):
         # self.num_people = self.init_num_people
         self.rent_regulated = random.choice([True, False])
         logging.debug(f"region {self.unique_id} rent regulation is {self.rent_regulated}.")
-        self.initial_quality = random.uniform(20, 100)
+        self.initial_quality = random.uniform(50, 100)
         logging.debug(f"region {self.unique_id} initial quality is {self.initial_quality}.")
         self.housing_quality = self.initial_quality
         self.rent_discount = rent_discount
@@ -219,7 +221,7 @@ class RegionAgent(mg.GeoAgent):
     def rent_price(self):
             # Calculate rent price, applying a discount if the region is rent regulated
             base_rent = 0.5 * self.area_ami
-            return base_rent * (1 - self.rent_discount) if self.rent_regulated else base_rent   
+            return base_rent * self.rent_discount if self.rent_regulated else base_rent   
     
     @property
     def num_complaints(self):
@@ -266,10 +268,10 @@ class RegionAgent(mg.GeoAgent):
         logging.debug(f"Region's rent regulation is {self.rent_regulated}, quality is {self.housing_quality},rent is {self.rent_price} and overall AMI is {self.area_ami}, own AMI is {self.own_ami}")
         self.decays()
         if self.rent_regulated:
-            if self.housing_quality < 40 or self.num_complaints > 20:
+            if self.housing_quality < 40 or self.num_complaints > 40:
                 self.renovate()
         else:
-            if self.housing_quality < 50 or self.num_complaints > 10:
+            if self.housing_quality < 50 or self.num_complaints > 30:
                 self.renovate()
     
     def decays(self):
@@ -284,7 +286,7 @@ class RegionAgent(mg.GeoAgent):
         else: 
             self.housing_quality = 60
         self.renovations += 1
-        logging.debug(f"Region {self.unique_id} is renovated.")
+        logging.debug(f"Region {self.unique_id} is renovated and has {self.people_count} Households.")
         self.steps = 0  # Reset step counter after renovation
         
 

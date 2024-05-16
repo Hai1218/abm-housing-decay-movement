@@ -51,7 +51,7 @@ def housing_draw(agent):
                 portrayal['opacity'] = 0.1
             else:
                 portrayal["opacity"] = 1.0
-        elif agent.housing_quality < 50:
+        elif agent.housing_quality < 30:
             portrayal["color"] = "Red"
             if agent.rent_regulated:
                 portrayal['opacity'] = 0.1
