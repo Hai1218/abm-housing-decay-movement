@@ -23,6 +23,7 @@ class PersonAgent(mg.GeoAgent):
     def __init__(self, unique_id, model, geometry, crs, income_level, max_complaint, region_id):
         super().__init__(unique_id, model, geometry, crs)
         self.income_level = income_level
+        # self.quality_threshold_pegged_income = True
         self.region_id = region_id
         self.move_count = 0 #tracking household movements 
         # self.happiness = True #if false, finds a suitable region or be displaced
@@ -43,6 +44,7 @@ class PersonAgent(mg.GeoAgent):
             int: The housing quality threshold, adjusted to not exceed 90 if too high,
             and not drop below 50 if too low.
         """
+        #deal with threshold distribution at some point !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         quality = 100 * self.income_level
         if quality > 100:
             return 90
@@ -63,29 +65,39 @@ class PersonAgent(mg.GeoAgent):
         The agent first checks if the rent exceeds their affordability threshold, deciding to move immediately if so.
         If the rent is affordable, the agent then checks the housing quality and decides to move if it's below the threshold for a specified number of consecutive steps.
         """
-        current_region = self.model.space.get_region_by_id(self.region_id)
+        current_region = self.model.space.get_region_by_id(self.region_id) #locates houshold's region(census tract)
         
         if self.is_displaced:
+            #if the household is displaced, it tries to find a suitable region
             self.move_to_suitable_region()
+            logging.debug(f"Displaced Household{self.unique_id} Trying to Move")
+            pass
 
         # Immediate move if rent is too high
         if current_region.rent_price > self.maximum_affordable_rent:
             self.move_to_suitable_region()
-            #self.unhappiness_due_to_quality_count = 0  # Reset the unhappiness count related to quality
+            self.complaints = 0  # Reset the complaint count, if any, once moved; 
+            logging.debug(f"Houshold {self.unique_id} Trying to Move - Affordability")
+            pass
         else:
-            # Check housing quality if rent is affordable
+            # rent is afforable, checks housing quality 
             if current_region.housing_quality < self.housing_quality_threshold:
-                self.unhappiness_due_to_quality_count += 1  # Increment unhappiness count
-                self.make_complaints()  # Make a complaint when housing quality is too low
+                self.complaints += 1  # Increment complaint counts
+                self.total_complaints += 1 # Increment total complaints made by houshold
+                logging.debug(f"Houshold {self.unique_id} Made A Complaint")
+                if self.complaints >= self.max_complaint:# check if there has been more than the max complaints to trigger move
+                    self.move_to_suitable_region()
+                    self.complaints = 0  # Reset the counter after moving
+                    logging.debug(f"Houshold {self.unique_id} Trying to Move - Quality")
+                    pass
+                else:
+                    pass
             else:
-                # Reset the unhappiness and complaint count if conditions are satisfactory
-                self.unhappiness_due_to_quality_count = 0
-                # self.complaints = 0
+                #housing quality could be improved before the houshold collects enough complaints to trigger move, complaint counts reset when improved; 
+                self.complaints = 0
+                logging.debug(f"Houshold {self.unique_id} Found Quality Acceptable - Reset Complaints")
+                pass
 
-            # Decide to move if housing quality has been consistently poor
-            if self.unhappiness_due_to_quality_count >= self.max_complaint:
-                self.move_to_suitable_region()
-                self.unhappiness_due_to_quality_count = 0  # Reset the counter after moving
 
 
     # def step(self):
@@ -124,35 +136,38 @@ class PersonAgent(mg.GeoAgent):
 
 
     def move_to_suitable_region(self):
+        """
+        Generate a list of suitable regions, move to a random region within that list
 
-        # suitable_regions = [agent for agent in self.model.space.agents if isinstance(agent, RegionAgent) and
-        #                     agent.housing_quality >= self.housing_quality_threshold and
-        #                     agent.rent_price <= self.maximum_affordable_rent and agent.people_count <= 2]
+        """
+
         suitable_regions = [agent for agent in self.model.space.agents if isinstance(agent, RegionAgent) and
                             agent.housing_quality >= self.housing_quality_threshold and
-                            agent.rent_price <= self.maximum_affordable_rent]
+                            agent.rent_price <= self.maximum_affordable_rent and agent.people_count <= 2]
+        # ?? Should I make people_count in a region a parameter? 
+
         if suitable_regions:
             new_region = random.choice(suitable_regions)
             new_region_id = new_region.unique_id
             self.model.space.remove_person_from_region(self)
             self.model.space.add_person_to_region(self, region_id=new_region_id)
-            logging.debug(f"Agent {self.unique_id} has moved to {self.region_id}, quality threshold:{self.housing_quality_threshold}, new housing profile: {new_region.housing_quality, new_region.rent_price},income level: {self.maximum_affordable_rent}.")
-            self.move_count += 1
+            logging.debug(f"Household {self.unique_id} Moved to {self.region_id}")
+            self.move_count += 1 #increased a movement count
             #self.update_happiness()
-            self.complaints = 0 #reset compaints at this region since moved
+            #  self.complaints = 0 #reset compaints at this region since moved
         else:
             self.is_displaced = True
             self.displacement_count += 1
-            logging.debug(f"Agent {self.unique_id} is displaced,  quality threshold:{self.housing_quality_threshold}, income level: {self.income_level}.")
-            self.complaints = 0 #reset compaints at this region since displaced
+            logging.debug(f"Household {self.unique_id} Displaced")
+            # self.complaints = 0 #reset compaints at this region since displaced
 
 
     # def update_happiness(self):
     #     self.happiness = True
 
-    def make_complaints(self):
-        self.complaints += 1
-        self.total_complaints += 1
+    # def make_complaints(self):
+    #     self.complaints += 1
+    #     self.total_complaints += 1
 
 
 
@@ -164,10 +179,14 @@ class RegionAgent(mg.GeoAgent):
                  model, 
                  geometry, 
                  crs, 
+                 has_regulation,
                  rent_discount,
                  init_num_people, 
                  base_decay_constant, 
-                 decay_differential):
+                 decay_differential,
+                 base_renovation_cost,
+                 renovation_differential,
+                 rent_increase_differential):
         
 
         super().__init__(unique_id, 
@@ -178,18 +197,27 @@ class RegionAgent(mg.GeoAgent):
         self.init_num_people = init_num_people
         self.num_people = init_num_people
         # self.num_people = self.init_num_people
-        self.rent_regulated = random.choice([True, False])
-        logging.debug(f"region {self.unique_id} rent regulation is {self.rent_regulated}.")
+        self.has_regulation = has_regulation # allow rent regulation to be on or off
+        if self.has_regulation:
+            self.rent_regulated = random.choice([True, False])
+            logging.debug(f"Rent Regulation Activated: Region {self.unique_id} Rent Regulated is {self.rent_regulated}.")
+        else:
+            self.rent_regulated = random.choice([False, False])
+            logging.debug(f"Rent Regulation Not Active: Region {self.unique_id} Rent Regulated is {self.rent_regulated}.")
         self.initial_quality = random.uniform(50, 100)
-        logging.debug(f"region {self.unique_id} initial quality is {self.initial_quality}.")
+        logging.debug(f"Region {self.unique_id} Initial Quality is {self.initial_quality}.")
         self.housing_quality = self.initial_quality
         self.rent_discount = rent_discount
         self.renovations = 0
         # Set decay constants based on whether the region is rent-regulated
         if self.rent_regulated:
-            self.decay_constant = base_decay_constant + decay_differential
+            self.decay_constant = base_decay_constant + decay_differential #rent regulated housing dacays faster
+            self.renovation_cost = base_renovation_cost 
+            self.rent_increase = 1.02
         else:
-            self.decay_constant = base_decay_constant 
+            self.decay_constant = base_decay_constant
+            self.renovation_cost = base_renovation_cost + renovation_differential #non regulated costs more to renovate
+            self.rent_increase = 1.02 + rent_increase_differential
         self.steps = 0  # Initialize a step counter
 
 
@@ -219,9 +247,13 @@ class RegionAgent(mg.GeoAgent):
     
     @property
     def rent_price(self):
-            # Calculate rent price, applying a discount if the region is rent regulated
-            base_rent = 0.5 * self.area_ami
-            return base_rent * self.rent_discount if self.rent_regulated else base_rent   
+        # Calculate rent price, applying a discount if the region is rent regulated
+        base_rent = 0.5 * self.area_ami
+        if self.rent_regulated:
+            return base_rent * self.rent_discount * self.rent_increase ** self.renovations
+        else:
+            return base_rent * self.rent_increase ** self.renovations
+
     
     @property
     def num_complaints(self):
@@ -277,7 +309,7 @@ class RegionAgent(mg.GeoAgent):
     def decays(self):
         # Calculate exponential decay
         self.housing_quality = self.initial_quality * np.exp(-self.decay_constant * self.steps)
-        logging.debug(f"Region {self.unique_id} is decayed from {self.initial_quality} to {self.housing_quality}.")
+        logging.debug(f"Region {self.unique_id} Decayed from to {self.housing_quality}.")
 
     def renovate(self):
         # Resets housing quality and increments renovations counter
@@ -289,7 +321,9 @@ class RegionAgent(mg.GeoAgent):
         logging.debug(f"Region {self.unique_id} is renovated and has {self.people_count} Households.")
         self.steps = 0  # Reset step counter after renovation
         
-
+    def enforcement(self):
+        pass
+        
     def get_neighbors(self, distance):
         # Find neighboring regions within a certain distance
         return self.model.space.get_neighbors(self, distance, include_agents=False)
