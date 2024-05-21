@@ -48,8 +48,8 @@ class PersonAgent(mg.GeoAgent):
         quality = 100 * self.income_level
         if quality > 100:
             return 90
-        elif quality < 50:
-            return 50
+        elif quality < 40:
+            return 40
         else:
             return quality
 
@@ -253,7 +253,30 @@ class RegionAgent(mg.GeoAgent):
             return base_rent * self.rent_discount * self.rent_increase ** self.renovations
         else:
             return base_rent * self.rent_increase ** self.renovations
-
+        
+    @property
+    def rent_profit(self):
+        # Calculate base rent price based on area average median income (AMI)
+        base_rent = 0.5 * self.area_ami
+        
+        #dealing with first time renovations
+        if self.renovations == 0:
+            if self.rent_regulated: 
+                return base_rent * self.rent_discount * (self.rent_increase - 1) #simple 2% gain in rent
+            else: 
+                return base_rent * (self.rent_increase - 1) 
+        
+        else: #when renovation is more than 1
+            if self.rent_regulated:
+                new_rent = base_rent * self.rent_discount * (self.rent_increase ** (self.renovations + 1)) # for each additional renovation, the percentage increase stacks. 
+                current_rent = base_rent * self.rent_discount * (self.rent_increase ** self.renovations)  #calculate the current rent price price
+            else:
+                # For non-regulated areas, calculate the increase without the discount
+                new_rent = base_rent * (self.rent_increase ** (self.renovations + 1))
+                current_rent = base_rent * (self.rent_increase ** self.renovations)
+            
+            # Return the difference between the new rent and the previous rent
+            return new_rent - current_rent
     
     @property
     def num_complaints(self):
@@ -297,14 +320,17 @@ class RegionAgent(mg.GeoAgent):
     def step(self):
         # Increment step counter
         self.steps += 1
-        logging.debug(f"Region's rent regulation is {self.rent_regulated}, quality is {self.housing_quality},rent is {self.rent_price} and overall AMI is {self.area_ami}, own AMI is {self.own_ami}")
+        logging.debug(f"Region Rent Regulation is {self.rent_regulated}, Quality is {self.housing_quality},Rent is {self.rent_price}, Region AMI is {self.area_ami}, Own AMI is {self.own_ami}")
         self.decays()
-        if self.rent_regulated:
-            if self.housing_quality < 40 or self.num_complaints > 40:
-                self.renovate()
+        if self.num_complaints > 5:
+            self.enforcement()
         else:
-            if self.housing_quality < 50 or self.num_complaints > 30:
-                self.renovate()
+            logging.debug(f"Region {self.unique_id} did not trigger Enforcement with total {self.num_complaints} Complaints.")
+
+        if self.rent_profit * 60  > self.renovation_cost: # if 60 steps of rent increases recoups the renovation cost, renovation occurs
+            self.renovate()
+        else:
+            logging.debug(f"Region {self.unique_id} did not trigger Renovation with Rent Increase {self.rent_profit * 60} less than {self.renovation_cost}.")
     
     def decays(self):
         # Calculate exponential decay
@@ -316,13 +342,19 @@ class RegionAgent(mg.GeoAgent):
         if self.rent_regulated:
             self.housing_quality = 90
         else: 
-            self.housing_quality = 60
+            self.housing_quality = 100
         self.renovations += 1
         logging.debug(f"Region {self.unique_id} is renovated and has {self.people_count} Households.")
         self.steps = 0  # Reset step counter after renovation
         
     def enforcement(self):
-        pass
+        #After collecting enough complaints, enforecement kicks in, reset the housing quality to an acceptable number
+        if self.rent_regulated:
+            self.housing_quality = 50
+        else:
+            self.housing_quality = 60 
+        logging.debug(f"Region {self.unique_id} is enforced and has {self.people_count} Households.")
+        self.steps = 0 
         
     def get_neighbors(self, distance):
         # Find neighboring regions within a certain distance

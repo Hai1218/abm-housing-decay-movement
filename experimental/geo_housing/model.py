@@ -12,13 +12,19 @@ logging.basicConfig(level=logging.DEBUG)
 class GeoHousing(mesa.Model):
     def __init__(self, 
                  seed=None, 
+                 has_regulation = True,
                  rent_discount = 0.5,
                  decay_differential = 0.05,
                  base_decay_constant= 0.15, 
+                 base_renovation_cost = 1, 
+                 renovation_differential = 0.2,
+                 rent_increase_differential = 0.1,
                  init_num_people = 2,
                  max_complaint = 5
                  ):
+        
         super().__init__()
+        self.has_regulation = has_regulation
         self.rent_discount = rent_discount
         self.init_num_people = init_num_people
         self.decay_differential = decay_differential
@@ -47,10 +53,14 @@ class GeoHousing(mesa.Model):
         # Set up the grid with patches for every census tract
         ac = mg.AgentCreator(RegionAgent, 
                              model=self, 
-                             agent_kwargs = {"rent_discount":rent_discount,
+                             agent_kwargs = {"has_regulation":has_regulation,
+                                             "rent_discount":rent_discount,
                                              "init_num_people":init_num_people,
                                              "base_decay_constant":base_decay_constant,
-                                             "decay_differential":decay_differential
+                                             "decay_differential":decay_differential,
+                                             "base_renovation_cost":base_renovation_cost,
+                                             "renovation_differential":renovation_differential,
+                                             "rent_increase_differential":rent_increase_differential
                              },
                              )
         regions = ac.from_file(
