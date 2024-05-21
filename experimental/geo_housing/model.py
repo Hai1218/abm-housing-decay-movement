@@ -16,8 +16,7 @@ class GeoHousing(mesa.Model):
                  rent_discount = 0.5,
                  decay_differential = 0.05,
                  base_decay_constant= 0.15, 
-                 base_renovation_cost = 1, 
-                 renovation_differential = 0.2,
+                 num_month_rent_renovation = 4,
                  rent_increase_differential = 0.1,
                  init_num_people = 2,
                  max_complaint = 5
@@ -58,8 +57,7 @@ class GeoHousing(mesa.Model):
                                              "init_num_people":init_num_people,
                                              "base_decay_constant":base_decay_constant,
                                              "decay_differential":decay_differential,
-                                             "base_renovation_cost":base_renovation_cost,
-                                             "renovation_differential":renovation_differential,
+                                             "num_month_rent_renovation": num_month_rent_renovation,
                                              "rent_increase_differential":rent_increase_differential
                              },
                              )
@@ -76,7 +74,8 @@ class GeoHousing(mesa.Model):
                     model=self,
                     crs=self.space.crs,
                     geometry=region.random_point(),
-                    income_level=self.random.beta(2.5, 3.5),
+                    income_level=self.random.beta(2.5, 3.5) * 2,
+                    housing_quality_threshold=self.random.normal(65, 10),
                     region_id=region.unique_id,
                     max_complaint = self.max_complaint
                 )

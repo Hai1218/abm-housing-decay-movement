@@ -20,38 +20,48 @@ class PersonAgent(mg.GeoAgent):
         region_id (int): The identifier of the region where the agent is initially located.
     """
     
-    def __init__(self, unique_id, model, geometry, crs, income_level, max_complaint, region_id):
-        super().__init__(unique_id, model, geometry, crs)
+    def __init__(self, 
+                 unique_id, 
+                 model, 
+                 geometry, 
+                 crs,
+                 income_level, 
+                 housing_quality_threshold,
+                 max_complaint,
+                 region_id):
+        
+        super().__init__(unique_id, 
+                         model, 
+                         geometry, 
+                         crs)
         self.income_level = income_level
-        # self.quality_threshold_pegged_income = True
+        self.housing_quality_threshold = housing_quality_threshold
         self.region_id = region_id
         self.move_count = 0 #tracking household movements 
-        # self.happiness = True #if false, finds a suitable region or be displaced
         self.is_displaced = False
         self.displacement_count = 0 #housholds tries to move every step, counts the total number of displacement
-        self.unhappiness_due_to_quality_count = 0 #tracks housholds unhappy steps with acceptable rent but unacceptable housing quality
         self.max_complaint = max_complaint
         self.complaints = 0 #housing quality complaints made by housholds at a region, reset when moved
         self.total_complaints = 0 #accumulative complaints made by a household
 
-    @property
-    def housing_quality_threshold(self):
-        """
-        Calculates a modified housing quality threshold based on the agent's income level,
-        with a cap and a floor to ensure the threshold remains within realistic bounds.
+    # @property
+    # def housing_quality_threshold(self):
+    #     """
+    #     Calculates a modified housing quality threshold based on the agent's income level,
+    #     with a cap and a floor to ensure the threshold remains within realistic bounds.
 
-        Returns:
-            int: The housing quality threshold, adjusted to not exceed 90 if too high,
-            and not drop below 50 if too low.
-        """
-        #deal with threshold distribution at some point !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        quality = 100 * self.income_level
-        if quality > 100:
-            return 90
-        elif quality < 40:
-            return 40
-        else:
-            return quality
+    #     Returns:
+    #         int: The housing quality threshold, adjusted to not exceed 90 if too high,
+    #         and not drop below 50 if too low.
+    #     """
+    #     #deal with threshold distribution at some point !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #     quality = 100 * self.income_level
+    #     if quality > 100:
+    #         return 90
+    #     elif quality < 40:
+    #         return 40
+    #     else:
+    #         return quality
 
     @property
     def maximum_affordable_rent(self):
@@ -184,8 +194,7 @@ class RegionAgent(mg.GeoAgent):
                  init_num_people, 
                  base_decay_constant, 
                  decay_differential,
-                 base_renovation_cost,
-                 renovation_differential,
+                 num_month_rent_renovation, 
                  rent_increase_differential):
         
 
@@ -196,7 +205,7 @@ class RegionAgent(mg.GeoAgent):
                          )
         self.init_num_people = init_num_people
         self.num_people = init_num_people
-        # self.num_people = self.init_num_people
+        self.num_month_rent_renovation = num_month_rent_renovation
         self.has_regulation = has_regulation # allow rent regulation to be on or off
         if self.has_regulation:
             self.rent_regulated = random.choice([True, False])
@@ -212,11 +221,9 @@ class RegionAgent(mg.GeoAgent):
         # Set decay constants based on whether the region is rent-regulated
         if self.rent_regulated:
             self.decay_constant = base_decay_constant + decay_differential #rent regulated housing dacays faster
-            self.renovation_cost = base_renovation_cost 
             self.rent_increase = 1.02
         else:
             self.decay_constant = base_decay_constant
-            self.renovation_cost = base_renovation_cost + renovation_differential #non regulated costs more to renovate
             self.rent_increase = 1.02 + rent_increase_differential
         self.steps = 0  # Initialize a step counter
 
@@ -327,7 +334,7 @@ class RegionAgent(mg.GeoAgent):
         else:
             logging.debug(f"Region {self.unique_id} did not trigger Enforcement with total {self.num_complaints} Complaints.")
 
-        if self.rent_profit * 60  > self.renovation_cost: # if 60 steps of rent increases recoups the renovation cost, renovation occurs
+        if self.rent_profit * 120  > self.rent_price * self.num_month_rent_renovation: # if 120 steps of rent increases recoups the renovation cost, renovation occurs
             self.renovate()
         else:
             logging.debug(f"Region {self.unique_id} did not trigger Renovation with Rent Increase {self.rent_profit * 60} less than {self.renovation_cost}.")
