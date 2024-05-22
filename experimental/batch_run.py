@@ -10,13 +10,14 @@ import pandas as pd
 # parameters that will remain constant
 # parameters you want to vary
 parameters = {"has_regulation": [True, False],
-              "rent_discount": np.linspace(0.1,0.5,5),
+              "num_month_rent_renovation": [6, 8, 12, 24],
+              "rent_increase_differential": [0.02, 0.05, 0.08, 0.1],
+              "max_complaint": [4],  # Fixed value
+              "rent_discount": 0.5,
               "init_num_people": 2,
               "base_decay_constant": 0.15,
-              "decay_differential": 0.05,
-              "num_month_rent_renovation": range(6,13,1),
-              "rent_increase_differential": np.linspace(0.01,0.1,10),
-              "max_complaint": range(3,6,1)} 
+              "decay_differential": 0.05
+            }
 
 # what to run and what to collect
 # iterations is how many runs per parameter value
