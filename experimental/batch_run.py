@@ -10,9 +10,9 @@ import pandas as pd
 # parameters that will remain constant
 # parameters you want to vary
 parameters = {"has_regulation": [True, False],
-              "num_month_rent_renovation": [6, 8, 12, 24],
-              "rent_increase_differential": [0.02, 0.05, 0.08, 0.1],
-              "max_complaint": [4],  # Fixed value
+              "num_month_rent_renovation": [6, 12, 24],
+              "rent_increase_differential": [0.02, 0.05, 0.08],
+              "max_complaint": [3],  # Fixed value
               "rent_discount": 0.5,
               "init_num_people": 2,
               "base_decay_constant": 0.15,
