@@ -9,11 +9,14 @@ import pandas as pd
 # Here you will have elements that you want to sweep, eg:
 # parameters that will remain constant
 # parameters you want to vary
-parameters = {"rent_discount": 0.5,
+parameters = {"has_regulation": [True, False],
+              "rent_discount": np.linspace(0.1,0.5,5),
               "init_num_people": 2,
               "base_decay_constant": 0.15,
-              "decay_differential": np.linspace(0,0.2, 6),
-              "max_complaint": range(2,8,1)} 
+              "decay_differential": 0.05,
+              "num_month_rent_renovation": range(6,13,1),
+              "rent_increase_differential": np.linspace(0.02,0.09,7),
+              "max_complaint": range(3,5,1)} 
 
 # what to run and what to collect
 # iterations is how many runs per parameter value
@@ -21,14 +24,14 @@ parameters = {"rent_discount": 0.5,
 results = batch_run(GeoHousing, 
                     parameters,
                     iterations=10,  
-                    max_steps=30, 
+                    max_steps=20, 
                     data_collection_period = 2,
                     number_processes = 12) #how often do you want to pull the data
 
 
 
-## NOTE: to do data collection, you need to be sure your pathway is correct to save this!
-# Data collection
-# extract data as a pandas Data Frame
-pd.DataFrame(results).to_csv("batch_data.csv")
+# Convert the results to a DataFrame
+results_df = pd.DataFrame(results)
 
+# Save the results to a CSV file for further analysis
+results_df.to_csv("batch_data_final.csv", index=False)

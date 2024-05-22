@@ -36,15 +36,17 @@ class GeoHousing(mesa.Model):
         self.space = CensusTract()
         self.datacollector = mesa.DataCollector(
             {
+             "mean_quality": "mean_quality",
+             "mean_complaints": "mean_complaints",
+             "mean_displacement": "mean_displacement",
+             "mean_housing_quality": "mean_housing_quality",
+             "mean_rent_price": "mean_rent_price",
+             "hh_low_quality":"hh_low_quality",
+             "hh_rent_regulation": "hh_rent_regulation",
              "movement": "movement",
-             "li_movement": "low_income_movement",
-             "displaced": "displaced",
-             "li_displaced": "low_income_displaced",
-             "complaints": "complaints",
-             "li_complaints":"low_income_complaints",
-             "regulated_quality": "regulated_housing_quality",
-             "quality": "non_regulated_housing_quality",
-             "renovations": "renovations"
+             "attempt": "attempt",
+             "movement_li": "movement_li",
+             "attempt_li": "attempt_li",
              }
         )
 
@@ -88,20 +90,161 @@ class GeoHousing(mesa.Model):
         self.datacollector.collect(self)
 
     @property
-    def regulated_housing_quality(self):
-        housing_quality = 0
+    def mean_quality(self):
+        quality = 0
+        quality_li = 0
+        household_count = 0
+        household_count_li = 0
+        
         for agent in self.space.agents:
-            if isinstance(agent, RegionAgent) and agent.rent_regulated:
-                housing_quality += agent.housing_quality
-        return housing_quality
+            if isinstance(agent, PersonAgent):
+                region_quality = self.space.get_region_by_id(agent.region_id).housing_quality
+                if agent.income_level <= 0.5:
+                    household_count_li += 1
+                    quality_li += region_quality
+                else:
+                    household_count += 1
+                    quality += region_quality
+        
+        # Calculate mean qualities, checking for division by zero
+        mean_quality = quality / household_count if household_count > 0 else 0
+        mean_quality_li = quality_li / household_count_li if household_count_li > 0 else 0
+        
+        return (mean_quality, mean_quality_li)
+
+    @property
+    def mean_complaints(self):
+        complaints = 0
+        complaints_li = 0
+        household_count = 0
+        household_count_li = 0
+        
+        for agent in self.space.agents:
+            if isinstance(agent, PersonAgent):
+                if agent.income_level <= 0.5:
+                    household_count_li += 1
+                    complaints_li += agent.complaints
+                else:
+                    household_count += 1
+                    complaints += agent.complaints
+
+        mean_complaint = complaints / household_count if household_count > 0 else 0
+        mean_complaint_li = complaints_li / household_count_li if household_count_li > 0 else 0
+
+        return (mean_complaint, mean_complaint_li)
+        
+    @property
+    def mean_displacement(self):
+        displacements = 0
+        displacements_li = 0
+        household_count = 0
+        household_count_li = 0
+        
+        for agent in self.space.agents:
+            if isinstance(agent, PersonAgent):
+                if agent.income_level <= 0.5:
+                    household_count_li += 1
+                    if agent.is_displaced:
+                        displacements_li += 1
+                else:
+                    household_count += 1
+                    if agent.is_displaced:
+                        displacements += 1
+
+        mean_displacements = displacements / household_count if household_count > 0 else 0
+        mean_displacements_li = displacements_li / household_count_li if household_count_li > 0 else 0
+        
+        return (mean_displacements, mean_displacements_li)
     
     @property
-    def non_regulated_housing_quality(self):
-        housing_quality = 0
+    def mean_housing_quality(self):
+        regulated_quality_sum = 0
+        non_regulated_quality_sum = 0
+        regulated_count = 0
+        non_regulated_count = 0
+
         for agent in self.space.agents:
-            if isinstance(agent, RegionAgent) and not agent.rent_regulated:
-                housing_quality += agent.housing_quality
-        return housing_quality
+            if isinstance(agent, RegionAgent):
+                if agent.rent_regulated:
+                    regulated_quality_sum += agent.housing_quality
+                    regulated_count += 1
+                else:
+                    non_regulated_quality_sum += agent.housing_quality
+                    non_regulated_count += 1
+
+        mean_quality = regulated_quality_sum / regulated_count if regulated_count > 0 else 0
+        mean_quality_NR = non_regulated_quality_sum / non_regulated_count if non_regulated_count > 0 else 0
+
+        return (mean_quality, mean_quality_NR)
+    
+    @property
+    def mean_rent_price(self):
+        regulated_rent_sum = 0
+        non_regulated_rent_sum = 0
+        regulated_count = 0
+        non_regulated_count = 0
+
+        for agent in self.space.agents:
+            if isinstance(agent, RegionAgent):
+                if agent.rent_regulated:
+                    regulated_rent_sum += agent.rent_price
+                    regulated_count += 1
+                else:
+                    non_regulated_rent_sum += agent.rent_price
+                    non_regulated_count += 1
+
+        mean_rent = regulated_rent_sum / regulated_count if regulated_count > 0 else 0
+        mean_rent_NR = non_regulated_rent_sum / non_regulated_count if non_regulated_count > 0 else 0
+
+        return (mean_rent, mean_rent_NR)
+
+    @property
+    def hh_low_quality(self):
+        '''
+        households in low quality housing 
+        '''
+        household_count = 0
+        household_count_li = 0 
+        for agent in self.space.agents:
+            if isinstance(agent, RegionAgent) and agent.housing_quality < 50:
+                households = agent.model.space.get_agents_within_region(agent)
+                for household in households:
+                    if household.income_level <= 0.5:
+                        household_count_li += 1
+                    else:
+                        household_count += 1
+        return (household_count, household_count_li)
+    
+    @property
+    def hh_rent_regulation(self):
+        '''
+        households in rent regulated housing
+        '''
+        household_count = 0
+        household_count_NR = 0
+        for agent in self.space.agents:
+            if isinstance(agent, RegionAgent):
+                if agent.rent_regulated:
+                    household_count += agent.num_people
+                else:
+                    household_count_NR += agent.num_people
+        return (household_count, household_count_NR)
+        
+    # @property
+    # def mean_regulated_housing_quality(self):
+    #     housing_quality = 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, RegionAgent) and agent.rent_regulated:
+    #             housing_quality += agent.housing_quality
+    #     return housing_quality
+    
+    # @property
+    # def mean_non_regulated_housing_quality(self):
+    #     housing_quality = 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, RegionAgent) and not agent.rent_regulated:
+    #             housing_quality += agent.housing_quality
+    #     return housing_quality
     
     @property
     def movement(self):
@@ -111,63 +254,88 @@ class GeoHousing(mesa.Model):
                 num_movement += agent.move_count
         return num_movement
     
+
     @property
-    def low_income_movement(self):
+    def attempt(self):
+        attempt_rent = 0 
+        attempt_quality = 0
+        for agent in self.space.agents:
+            if isinstance(agent, PersonAgent):
+                attempt_rent += agent.attempt_rent
+                attempt_quality += agent.attempt_quality
+        return (attempt_rent, attempt_quality)
+    
+    
+    @property
+    def movement_li(self):
         num_movement = 0
         for agent in self.space.agents:
-            if isinstance(agent, PersonAgent) and agent.income_level <= 0.3:
+            if isinstance(agent, PersonAgent) and agent.income_level <= 0.5:
                 num_movement += agent.move_count
         return num_movement
     
-    @property
-    def renovations(self):
-        num_renovations = 0
-        for agent in self.space.agents:
-            if isinstance(agent, RegionAgent):
-                num_renovations += agent.renovations
-        return num_renovations
 
     @property
-    def displacement(self):
-        num_displacement= 0
+    def attempt_li(self):
+        attempt_rent = 0 
+        attempt_quality = 0
         for agent in self.space.agents:
-            if isinstance(agent, PersonAgent):
-                num_displacement += agent.displacement_count
-        return num_displacement
+            if isinstance(agent, PersonAgent) and agent.income_level <= 0.5:
+                attempt_rent += agent.attempt_rent
+                attempt_quality += agent.attempt_quality
+        return (attempt_rent, attempt_quality)
     
-    @property
-    def displaced(self):
-        num_displaced= 0
-        for agent in self.space.agents:
-            if isinstance(agent, PersonAgent):
-                if agent.is_displaced:
-                    num_displaced += 1
-        return num_displaced
     
-    @property
-    def low_income_displaced(self):
-        num_displaced= 0
-        for agent in self.space.agents:
-            if isinstance(agent, PersonAgent) and agent.income_level <= 0.3:
-                if agent.is_displaced:
-                    num_displaced += 1
-        return num_displaced
 
-    @property
-    def complaints(self):
-        num_complaints= 0
-        for agent in self.space.agents:
-            if isinstance(agent, RegionAgent):
-                num_complaints += agent.num_complaints
-        return num_complaints
+    # @property
+    # def renovations(self):
+    #     num_renovations = 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, RegionAgent):
+    #             num_renovations += agent.renovations
+    #     return num_renovations
+
+    # @property
+    # def displacement(self):
+    #     num_displacement= 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, PersonAgent):
+    #             num_displacement += agent.displacement_count
+    #     return num_displacement
     
-    @property
-    def low_income_complaints(self):
-        num_complaints= 0
-        for agent in self.space.agents:
-            if isinstance(agent, RegionAgent):
-                num_complaints += agent.low_income_num_complaints
-        return int(num_complaints)
+    # @property
+    # def displaced(self):
+    #     num_displaced= 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, PersonAgent):
+    #             if agent.is_displaced:
+    #                 num_displaced += 1
+    #     return num_displaced
+    
+    # @property
+    # def low_income_displaced(self):
+    #     num_displaced= 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, PersonAgent) and agent.income_level <= 0.3:
+    #             if agent.is_displaced:
+    #                 num_displaced += 1
+    #     return num_displaced
+
+    # @property
+    # def complaints(self):
+    #     num_complaints= 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, RegionAgent):
+    #             num_complaints += agent.num_complaints
+    #     return num_complaints
+    
+    # @property
+    # def low_income_complaints(self):
+    #     num_complaints= 0
+    #     for agent in self.space.agents:
+    #         if isinstance(agent, RegionAgent):
+    #             num_complaints += agent.low_income_num_complaints
+    #     return int(num_complaints)
     
        
 

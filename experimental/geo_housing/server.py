@@ -9,29 +9,30 @@ class MovementElement(mesa.visualization.TextElement):
     def render(self, model):
         return f"Total movements: {model.movement}"
     
-class RenovationElement(mesa.visualization.TextElement):
+class QualityElement(mesa.visualization.TextElement):
     def render(self, model):
-        return f"Total renovations: {model.renovations}"
-    
-class DisplacedElement(mesa.visualization.TextElement):
-    def render(self, model):
-        return f"Total Housholds Displaced: {model.displaced}"
-    
-class LowIncomeDisplacedElement(mesa.visualization.TextElement):
-    def render(self, model):
-        return f"Total Low-Income Housholds Displaced: {model.low_income_displaced}"
-
-class LowIncomeMovementElement(mesa.visualization.TextElement):
-    def render(self, model):
-        return f"Total Low-Income Housholds movements: {model.low_income_movement}"
+        return f"Mean Quality Experienced (Regular/Low Income Households): {model.mean_quality}"
     
 class ComplaintsElement(mesa.visualization.TextElement):
     def render(self, model):
-        return f"Total Housholds complaints: {model.complaints}"
+        return f"Mean Housing Complaints (Regular/Low Income Households): {model.mean_complaints}"
     
-class LowIncomeComplaintsElement(mesa.visualization.TextElement):
+class DisplacementElement(mesa.visualization.TextElement):
     def render(self, model):
-        return f"Total Low-Income Housholds complaints: {model.low_income_complaints}"
+        return f"Mean Displacement (Regular/Low Income Households): {model.mean_displacement}"
+    
+class HHLowQualityElement(mesa.visualization.TextElement):
+    def render(self, model):
+        return f"Number of Households in Low Quality Housing (Regular/Low Income) {model.hh_low_quality}"
+    
+class HousingQualityElement(mesa.visualization.TextElement):
+    def render(self, model):
+        return f"Mean Housing Quality (Regulated/Non-Regulated): {model.mean_housing_quality}"
+
+class RentElement(mesa.visualization.TextElement):
+    def render(self, model):
+        return f"Mean Rent (Regulated/Non-Regulated) {model.mean_rent_price}"
+
 
 model_params = {
     "has_regulation": mesa.visualization.Checkbox("Rent Regulation Enabled", True),
@@ -92,17 +93,17 @@ def housing_draw(agent):
         if agent.is_displaced:
             portrayal["color"] = "Grey"
         else:
-            portrayal["color"] = "Red" if agent.income_level < 0.5 else "Blue"
+            portrayal["color"] = "Red" if agent.income_level < 0.8 else "Blue"
     return portrayal
 
 
 movement_element = MovementElement()
-displaced_element = DisplacedElement()
-renovation_element = RenovationElement()
-low_income_displaced_element = LowIncomeDisplacedElement()
-low_income_movement_element = LowIncomeMovementElement()
+quality_element = QualityElement()
 complaints_element = ComplaintsElement()
-low_income_complaints_element = LowIncomeComplaintsElement()
+displacement_element = DisplacementElement()
+hh_low_quality_element = HHLowQualityElement()
+housing_quality_element = HousingQualityElement()
+rent_element = RentElement()
 
 map_element = mg.visualization.MapModule(
     housing_draw, tiles=xyz.CartoDB.Positron
@@ -110,16 +111,16 @@ map_element = mg.visualization.MapModule(
 chart = mesa.visualization.ChartModule(
     [
         {"Label": "movement", "Color": "Blue"},
-        {"Label": "displaced","Color": "Grey"},
+        {"Label": "mean_quality","Color": "Grey"},
        
     ]
 )
 server = mesa.visualization.ModularServer(
     GeoHousing,
-    [map_element, movement_element, low_income_movement_element, 
-     displaced_element, low_income_displaced_element, 
-     renovation_element, 
-     complaints_element, low_income_complaints_element, 
+    [map_element, movement_element, 
+     quality_element, complaints_element, 
+     displacement_element, hh_low_quality_element, 
+     housing_quality_element, rent_element, 
      chart],
 
     "Housing Quality and Movement",

@@ -38,6 +38,9 @@ class PersonAgent(mg.GeoAgent):
         self.housing_quality_threshold = housing_quality_threshold
         self.region_id = region_id
         self.move_count = 0 #tracking household movements 
+        self.attempt_rent = 0 
+        self.attempt_quality = 0 
+        self.attempt_displaced = 0 
         self.is_displaced = False
         self.displacement_count = 0 #housholds tries to move every step, counts the total number of displacement
         self.max_complaint = max_complaint
@@ -81,11 +84,13 @@ class PersonAgent(mg.GeoAgent):
             #if the household is displaced, it tries to find a suitable region
             self.move_to_suitable_region()
             logging.debug(f"Displaced Household{self.unique_id} Trying to Move")
+            self.attempt_displaced += 1
             pass
 
         # Immediate move if rent is too high
         if current_region.rent_price > self.maximum_affordable_rent:
             self.move_to_suitable_region()
+            self.attempt_rent += 1
             self.complaints = 0  # Reset the complaint count, if any, once moved; 
             logging.debug(f"Houshold {self.unique_id} Trying to Move - Affordability")
             pass
@@ -97,6 +102,7 @@ class PersonAgent(mg.GeoAgent):
                 logging.debug(f"Houshold {self.unique_id} Made A Complaint")
                 if self.complaints >= self.max_complaint:# check if there has been more than the max complaints to trigger move
                     self.move_to_suitable_region()
+                    self.attempt_quality += 1
                     self.complaints = 0  # Reset the counter after moving
                     logging.debug(f"Houshold {self.unique_id} Trying to Move - Quality")
                     pass
@@ -334,10 +340,11 @@ class RegionAgent(mg.GeoAgent):
         else:
             logging.debug(f"Region {self.unique_id} did not trigger Enforcement with total {self.num_complaints} Complaints.")
 
-        if self.rent_profit * 120  > self.rent_price * self.num_month_rent_renovation: # if 120 steps of rent increases recoups the renovation cost, renovation occurs
+        if self.rent_profit * 60  > self.rent_price * self.num_month_rent_renovation: # if 120 steps of rent increases recoups the renovation cost, renovation occurs
+            logging.debug(f"Region renovating -  Rent Profit is {self.rent_profit * 69} and Renovation Cost is {self.rent_price * self.num_month_rent_renovation}")
             self.renovate()
         else:
-            logging.debug(f"Region {self.unique_id} did not trigger Renovation with Rent Increase {self.rent_profit * 60} less than {self.renovation_cost}.")
+            logging.debug(f"Region {self.unique_id} did not trigger Renovation with Rent Increase {self.rent_profit * 120} less than {self.rent_price * self.num_month_rent_renovation}.")
     
     def decays(self):
         # Calculate exponential decay
