@@ -15,8 +15,8 @@ parameters = {"has_regulation": [True, False],
               "base_decay_constant": 0.15,
               "decay_differential": 0.05,
               "num_month_rent_renovation": range(6,13,1),
-              "rent_increase_differential": np.linspace(0.02,0.09,7),
-              "max_complaint": range(3,5,1)} 
+              "rent_increase_differential": np.linspace(0.01,0.1,10),
+              "max_complaint": range(3,6,1)} 
 
 # what to run and what to collect
 # iterations is how many runs per parameter value
